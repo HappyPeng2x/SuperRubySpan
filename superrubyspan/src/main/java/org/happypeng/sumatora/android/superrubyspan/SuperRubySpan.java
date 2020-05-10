@@ -18,14 +18,14 @@ public class SuperRubySpan extends ReplacementSpan {
         mFurigana = aFurigana;
     }
 
-    private static void applySpansToPaint(@NonNull Spanned aText, int aStart, int aEnd,
-                                          @NonNull TextPaint aPaint) {
+    private void applySpansToPaint(@NonNull Spanned aText, int aStart, int aEnd,
+                                   @NonNull TextPaint aPaint) {
         MetricAffectingSpan[] metricAffectingSpans =
                 aText.getSpans(aStart, aEnd,
                         MetricAffectingSpan.class);
 
         for (MetricAffectingSpan span : metricAffectingSpans) {
-            if (!(span instanceof SuperRubySpan)) {
+            if (span != this) {
                 span.updateMeasureState(aPaint);
             }
         }
@@ -35,99 +35,153 @@ public class SuperRubySpan extends ReplacementSpan {
                         CharacterStyle.class);
 
         for (CharacterStyle style : characterStyles) {
-            style.updateDrawState(aPaint);
+            if (style != this) {
+                style.updateDrawState(aPaint);
+            }
         }
+    }
+
+    private ReplacementSpan getReplacementSpan(@NonNull CharSequence text, int start, int end) {
+        ReplacementSpan replacementSpan = null;
+
+        if (!(text instanceof Spanned)) {
+            return null;
+        }
+
+        for (ReplacementSpan span : ((Spanned) text).getSpans(start, end, ReplacementSpan.class))  {
+            if (span != this) {
+                replacementSpan = span;
+            }
+        }
+
+        return replacementSpan;
+    }
+
+    private static class TextSizeInformation {
+        final TextPaint paint;
+        final Paint.FontMetricsInt fontMetricsInt;
+        final float size;
+        final ReplacementSpan replacementSpan;
+
+        TextSizeInformation(final TextPaint aPaint,
+                            final Paint.FontMetricsInt aFontMetricsInt,
+                            final float aSize,
+                            final ReplacementSpan aReplacementSpan) {
+            paint = aPaint;
+            fontMetricsInt = aFontMetricsInt;
+            size = aSize;
+            replacementSpan = aReplacementSpan;
+        }
+    }
+
+    private TextSizeInformation getTextSize(@NonNull Paint paint, CharSequence text, int start, int end) {
+        final ReplacementSpan replacementSpan = getReplacementSpan(text, start, end);
+
+        if (replacementSpan != null) {
+            final Paint.FontMetricsInt fontMetricsInt = new Paint.FontMetricsInt();
+            final float size = replacementSpan.getSize(paint, text, start, end, fontMetricsInt);
+
+            return new TextSizeInformation(null, fontMetricsInt, size, replacementSpan);
+        }
+
+        final TextPaint textPaint = new TextPaint(paint);
+
+        if (text instanceof Spanned) {
+            applySpansToPaint((Spanned) text, start, end,
+                    textPaint);
+        }
+
+        final Paint.FontMetricsInt fontMetricsInt = textPaint.getFontMetricsInt();
+        final float size = textPaint.measureText(text, start, end);
+
+        return new TextSizeInformation(textPaint, fontMetricsInt, size, null);
     }
 
     @Override
     public int getSize(@NonNull Paint paint, CharSequence text, int start, int end, @Nullable Paint.FontMetricsInt fm) {
-        final TextPaint furiganaPaint = new TextPaint(paint);
-        final TextPaint textPaint = new TextPaint(paint);
-
-        if (text instanceof Spanned) {
-            applySpansToPaint((Spanned) text, start, end,
-                    textPaint);
-        }
-
-        if (mFurigana instanceof Spanned) {
-            applySpansToPaint((Spanned) mFurigana, 0, mFurigana.length(),
-                    furiganaPaint);
-        }
-
-        final Paint.FontMetricsInt furiganaFm = furiganaPaint.getFontMetricsInt();
+        final TextSizeInformation textSizeInformation = getTextSize(paint, text, start, end);
+        final TextSizeInformation furiganaSizeInformation = getTextSize(textSizeInformation.paint == null ? paint : textSizeInformation.paint,
+                mFurigana, 0, mFurigana.length());
 
         if (fm != null) {
-            final Paint.FontMetricsInt textFm = paint.getFontMetricsInt();
-
-            fm.bottom = textFm.bottom;
-            fm.ascent = textFm.ascent + (furiganaFm.ascent - furiganaFm.descent);
-            fm.top = textFm.ascent + (furiganaFm.top - furiganaFm.descent);
-            fm.descent = textFm.descent;
-            fm.leading = textFm.leading;
+            fm.bottom = textSizeInformation.fontMetricsInt.bottom;
+            fm.ascent = textSizeInformation.fontMetricsInt.ascent +
+                    (furiganaSizeInformation.fontMetricsInt.ascent - furiganaSizeInformation.fontMetricsInt.descent);
+            fm.top = textSizeInformation.fontMetricsInt.ascent +
+                    (furiganaSizeInformation.fontMetricsInt.top - furiganaSizeInformation.fontMetricsInt.descent);
+            fm.descent = textSizeInformation.fontMetricsInt.descent;
+            fm.leading = textSizeInformation.fontMetricsInt.leading;
         }
 
-        final float textSize = textPaint.measureText(text, start, end);
-        final float furiganaSize = furiganaPaint.measureText(mFurigana, 0, mFurigana.length());
-
-        return Math.round(Math.max(textSize, furiganaSize));
+        return Math.round(Math.max(textSizeInformation.size,
+                furiganaSizeInformation.size));
     }
 
     @Override
     public void draw(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {
-        final TextPaint furiganaPaint = new TextPaint(paint);
-        final TextPaint textPaint = new TextPaint(paint);
+        final TextSizeInformation textSizeInformation = getTextSize(paint, text, start, end);
+        final TextSizeInformation furiganaSizeInformation = getTextSize(textSizeInformation.paint == null ? paint : textSizeInformation.paint, mFurigana, 0, mFurigana.length());
+        final float spanSize = Math.round(Math.max(textSizeInformation.size,
+                furiganaSizeInformation.size));
 
-        if (text instanceof Spanned) {
-            applySpansToPaint((Spanned) text, start, end,
-                    textPaint);
+        if (textSizeInformation.paint != null) {
+            if(textSizeInformation.paint.bgColor != 0) {
+                int previousColor = textSizeInformation.paint.getColor();
+                Paint.Style previousStyle = textSizeInformation.paint.getStyle();
+                textSizeInformation.paint.setColor(textSizeInformation.paint.bgColor);
+                textSizeInformation.paint.setStyle(Paint.Style.FILL);
+                canvas.drawRect(x + (spanSize - textSizeInformation.size) / 2f,
+                        y + textSizeInformation.fontMetricsInt.top,
+                        x + (spanSize - textSizeInformation.size) / 2f + textSizeInformation.size,
+                        y + textSizeInformation.fontMetricsInt.bottom, textSizeInformation.paint);
+                textSizeInformation.paint.setStyle(previousStyle);
+                textSizeInformation.paint.setColor(previousColor);
+            }
+
+            canvas.drawText(text, start, end,
+                    x + (spanSize - textSizeInformation.size) / 2f, y, textSizeInformation.paint);
+        } else if (textSizeInformation.replacementSpan != null) {
+            textSizeInformation.replacementSpan.draw(canvas, text, start, end,
+                    x + (spanSize - textSizeInformation.size) / 2f,
+                    top - textSizeInformation.fontMetricsInt.ascent +
+                            furiganaSizeInformation.fontMetricsInt.descent,
+                    y,
+                    bottom, paint);
         }
 
-        if (mFurigana instanceof Spanned) {
-            applySpansToPaint((Spanned) mFurigana, 0, mFurigana.length(),
-                    furiganaPaint);
-        }
+        if (furiganaSizeInformation.paint != null) {
+            if (furiganaSizeInformation.paint.bgColor != 0) {
+                int previousColor = furiganaSizeInformation.paint.getColor();
+                Paint.Style previousStyle = furiganaSizeInformation.paint.getStyle();
+                furiganaSizeInformation.paint.setColor(furiganaSizeInformation.paint.bgColor);
+                furiganaSizeInformation.paint.setStyle(Paint.Style.FILL);
+                canvas.drawRect(x + (spanSize - furiganaSizeInformation.size) / 2f,
+                        y + textSizeInformation.fontMetricsInt.ascent -
+                                furiganaSizeInformation.fontMetricsInt.descent
+                                + furiganaSizeInformation.fontMetricsInt.top,
+                        x + (spanSize - furiganaSizeInformation.size) / 2f + furiganaSizeInformation.size,
+                        y + textSizeInformation.fontMetricsInt.ascent -
+                                furiganaSizeInformation.fontMetricsInt.descent
+                                + furiganaSizeInformation.fontMetricsInt.bottom, furiganaSizeInformation.paint);
+                furiganaSizeInformation.paint.setStyle(previousStyle);
+                furiganaSizeInformation.paint.setColor(previousColor);
+            }
 
-        final Paint.FontMetricsInt textFm = textPaint.getFontMetricsInt();
-        final Paint.FontMetricsInt furiganaFm = furiganaPaint.getFontMetricsInt();;
-
-
-        final float furiganaTextSize = furiganaPaint.measureText(mFurigana, 0, mFurigana.length());
-        final float textSize = textPaint.measureText(text, start, end);
-
-        final float spanSize = Math.max(furiganaTextSize, textSize);
-
-        if (textPaint.bgColor != 0) {
-            int previousColor = textPaint.getColor();
-            Paint.Style previousStyle = textPaint.getStyle();
-            textPaint.setColor(textPaint.bgColor);
-            textPaint.setStyle(Paint.Style.FILL);
-            canvas.drawRect(x + (spanSize - textSize)/2f,
-                    top - (furiganaFm.top - furiganaFm.descent),
-                    x + (spanSize - textSize)/2f + textSize,
-                    bottom, textPaint);
-            textPaint.setStyle(previousStyle);
-            textPaint.setColor(previousColor);
-        }
-
-        if (furiganaPaint.bgColor != 0) {
-            int previousColor = furiganaPaint.getColor();
-            Paint.Style previousStyle = furiganaPaint.getStyle();
-            furiganaPaint.setColor(furiganaPaint.bgColor);
-            furiganaPaint.setStyle(Paint.Style.FILL);
-            canvas.drawRect(x + (spanSize - furiganaTextSize)/2f,
+            canvas.drawText(mFurigana, 0, mFurigana.length(),
+                    x + (spanSize - furiganaSizeInformation.size) / 2f,
+                    y + textSizeInformation.fontMetricsInt.ascent -
+                            furiganaSizeInformation.fontMetricsInt.descent,
+                    furiganaSizeInformation.paint);
+        } else if (furiganaSizeInformation.replacementSpan != null) {
+            furiganaSizeInformation.replacementSpan.draw(canvas, mFurigana, 0, mFurigana.length(),
+                    x + (spanSize - furiganaSizeInformation.size) / 2f,
                     top,
-                    x + (spanSize - furiganaTextSize)/2f + furiganaTextSize,
-                    top - (furiganaFm.top - furiganaFm.descent), furiganaPaint);
-            furiganaPaint.setStyle(previousStyle);
-            furiganaPaint.setColor(previousColor);
+                    y + textSizeInformation.fontMetricsInt.ascent -
+                            furiganaSizeInformation.fontMetricsInt.descent,
+                    bottom + textSizeInformation.fontMetricsInt.ascent -
+                            furiganaSizeInformation.fontMetricsInt.descent -
+                        furiganaSizeInformation.fontMetricsInt.bottom,
+                        paint);
         }
-
-        canvas.drawText(text, start, end,
-                x + (spanSize - textSize) / 2f, y, textPaint);
-
-        canvas.drawText(mFurigana, 0, mFurigana.length(),
-                x + (spanSize - furiganaTextSize) / 2f,
-                y + textFm.ascent - furiganaFm.descent,
-                furiganaPaint);
     }
 }
