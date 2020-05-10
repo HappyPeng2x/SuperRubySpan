@@ -1,0 +1,3 @@
+rootProject.name='Super Ruby Span Demo'
+include ':app'
+include ':superrubyspan'
