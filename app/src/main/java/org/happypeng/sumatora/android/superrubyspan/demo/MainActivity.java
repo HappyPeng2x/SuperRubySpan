@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2020 Nicolas Centa
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.happypeng.sumatora.android.superrubyspan.demo;
 
 import android.graphics.Color;
@@ -26,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
         SpannableStringBuilder furiganaFuriganaBuilder =
                 new SpannableStringBuilder();
 
-        furiganaBuilder.append("漢字2");
+        furiganaBuilder.append("漢字");
 
         furiganaBuilder.setSpan(new RelativeSizeSpan(0.75f),
                 0, furiganaBuilder.length(),
@@ -43,26 +59,26 @@ public class MainActivity extends AppCompatActivity {
         furiganaFuriganaBuilder.append("かんじ");
 
         furiganaFuriganaBuilder.setSpan(new RelativeSizeSpan(0.75f),
-                0, furiganaBuilder.length(),
+                0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.CYAN),
-                0, furiganaBuilder.length(),
+                0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         furiganaFuriganaBuilder.setSpan(new BackgroundColorSpan(Color.MAGENTA),
-                0, furiganaBuilder.length(),
+                0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         furiganaFuriganaBuilder.setSpan(new StrikethroughSpan(),
-                0, furiganaBuilder.length(),
+                0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder),
                 0, furiganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-        textBuilder.append("漢字");
+        textBuilder.append("漢字２");
 
         textBuilder.setSpan(new SuperRubySpan(furiganaBuilder),
                 0, textBuilder.length(),
@@ -155,6 +171,27 @@ public class MainActivity extends AppCompatActivity {
         furiganaFuriganaBuilder.setSpan(new RelativeSizeSpan(0.75f),
                 0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.RED),
+                0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.GREEN),
+                1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.BLUE),
+                2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.CYAN),
+                3, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.MAGENTA),
+                4, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.YELLOW),
+                5, 6, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.DKGRAY),
+                6, 7, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder),
                 0, furiganaBuilder.length(),
