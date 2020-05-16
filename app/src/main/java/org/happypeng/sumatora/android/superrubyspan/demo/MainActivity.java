@@ -74,13 +74,17 @@ public class MainActivity extends AppCompatActivity {
                 0, furiganaFuriganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-        furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder),
+        furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder,
+                        SuperRubySpan.Alignment.CENTER,
+                        SuperRubySpan.Alignment.JIS),
                 0, furiganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         textBuilder.append("漢字２");
 
-        textBuilder.setSpan(new SuperRubySpan(furiganaBuilder),
+        textBuilder.setSpan(new SuperRubySpan(furiganaBuilder,
+                        SuperRubySpan.Alignment.CENTER,
+                        SuperRubySpan.Alignment.CENTER),
                 0, textBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
@@ -136,7 +140,9 @@ public class MainActivity extends AppCompatActivity {
 
         furiganaFuriganaBuilder.append("Android");
 
-        furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder),
+        furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder,
+                        SuperRubySpan.Alignment.CENTER,
+                        SuperRubySpan.Alignment.JIS),
                 0, furiganaBuilder.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
@@ -204,6 +210,61 @@ public class MainActivity extends AppCompatActivity {
         return spannableStringBuilder;
     }
 
+    private CharSequence test4() {
+        SpannableStringBuilder spannableStringBuilder =
+                new SpannableStringBuilder();
+        SpannableStringBuilder furiganaBuilder =
+                new SpannableStringBuilder();
+        SpannableStringBuilder furiganaFuriganaBuilder =
+                new SpannableStringBuilder();
+
+        spannableStringBuilder.append("Android");
+
+        furiganaBuilder.append("test");
+
+        final Drawable myIcon = getResources().getDrawable(R.drawable.ic_android_black_24dp);
+        myIcon.setBounds(0, 0, myIcon.getIntrinsicWidth(), myIcon.getIntrinsicHeight());
+
+        furiganaBuilder.setSpan(new ImageSpan(myIcon, ImageSpan.ALIGN_BASELINE),
+                0, furiganaBuilder.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.append("アンドロイド");
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.RED),
+                0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.GREEN),
+                1, 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.BLUE),
+                2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.CYAN),
+                3, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.MAGENTA),
+                4, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new ForegroundColorSpan(Color.YELLOW),
+                5, 6, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaFuriganaBuilder.setSpan(new RelativeSizeSpan(1.2f),
+                0, furiganaFuriganaBuilder.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        furiganaBuilder.setSpan(new SuperRubySpan(furiganaFuriganaBuilder),
+                0, furiganaBuilder.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        spannableStringBuilder.setSpan(new SuperRubySpan(furiganaBuilder,
+                        SuperRubySpan.Alignment.JUSTIFIED, SuperRubySpan.Alignment.CENTER),
+                0, spannableStringBuilder.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+        return spannableStringBuilder;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -219,6 +280,8 @@ public class MainActivity extends AppCompatActivity {
         spannableStringBuilder.append(test2());
         spannableStringBuilder.append(" ");
         spannableStringBuilder.append(test3());
+        spannableStringBuilder.append(" ");
+        spannableStringBuilder.append(test4());
 
         mainTextView.setText(spannableStringBuilder);
     }

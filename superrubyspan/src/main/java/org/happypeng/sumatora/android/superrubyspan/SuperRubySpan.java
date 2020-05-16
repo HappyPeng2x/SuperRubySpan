@@ -24,23 +24,52 @@ import android.text.style.CharacterStyle;
 import android.text.style.MetricAffectingSpan;
 import android.text.style.ReplacementSpan;
 
+import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 public class SuperRubySpan extends ReplacementSpan {
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({Alignment.BEGIN, Alignment.END,
+            Alignment.CENTER, Alignment.JUSTIFIED, Alignment.JIS})
+    public @interface Alignment {
+        int BEGIN = 0;
+        int END = 1;
+        int CENTER = 2;
+        int JUSTIFIED = 3;
+        int JIS = 4;
+    }
+
     private final @NonNull CharSequence mFurigana;
+    private final @Alignment int mTextAlignment;
+    private final @Alignment int mFuriganaAlignment;
 
     public SuperRubySpan(final @NonNull CharSequence aFurigana) {
+        this(aFurigana, Alignment.CENTER, Alignment.CENTER);
+    }
+
+    // Priority on top for aTextAlignment: if aFurigana contains
+    // a SuperRubySpan, its aTextAlignment will be applied,
+    // not aFuriganaAlignment here.
+
+    public SuperRubySpan(final @NonNull CharSequence aFurigana,
+                         final @Alignment int aTextAlignment,
+                         final @Alignment int aFuriganaAlignment) {
         mFurigana = aFurigana;
+        mTextAlignment = aTextAlignment;
+        mFuriganaAlignment = aFuriganaAlignment;
     }
 
     private <T> List<T> getSpans(final @NonNull Spanned text, int start, int end, Class<T> type) {
         final LinkedList<T> list = new LinkedList<>();
 
-        for (T span : ((Spanned) text).getSpans(start, end, type)) {
+        for (T span : text.getSpans(start, end, type)) {
             if (span != this) {
                 list.add(span);
             }
@@ -89,6 +118,9 @@ public class SuperRubySpan extends ReplacementSpan {
         final TextPaint textPaint;
         final Paint.FontMetricsInt fontMetricsInt;
 
+        float spaceBefore;
+        float spaceAfter;
+
         private CharSequenceSizedElement(final CharSequenceElement aCharSequenceElement,
                                          final float aSize,
                                          final TextPaint aTextPaint,
@@ -97,6 +129,9 @@ public class SuperRubySpan extends ReplacementSpan {
             size = aSize;
             textPaint = aTextPaint;
             fontMetricsInt = aFontMetricsInt;
+
+            spaceBefore = 0;
+            spaceAfter = 0;
         }
     }
 
@@ -191,12 +226,133 @@ public class SuperRubySpan extends ReplacementSpan {
         baseFontMetricsInt.top = Math.min(baseFontMetricsInt.top, newFontMetricsInt.top);
     }
 
+    private static void centerText(final @NonNull TextSizeInformation textSizeInformation,
+                                   final float size) {
+        final Iterator<CharSequenceSizedElement> charSequenceElementIterator = textSizeInformation.charSequenceSizedElements.iterator();
+        int count = 0;
+        final float extraSpace = size - textSizeInformation.size;
+
+        while (charSequenceElementIterator.hasNext()) {
+            final CharSequenceSizedElement charSequenceSizedElement = charSequenceElementIterator.next();
+
+            if (count == 0) {
+                charSequenceSizedElement.spaceBefore = extraSpace / 2;
+            }
+
+            if (!charSequenceElementIterator.hasNext()) {
+                charSequenceSizedElement.spaceAfter = extraSpace / 2;
+            }
+
+            count++;
+        }
+    }
+
+    private static void alignTextLeft(final @NonNull TextSizeInformation textSizeInformation,
+                                      final float size) {
+        final Iterator<CharSequenceSizedElement> charSequenceElementIterator = textSizeInformation.charSequenceSizedElements.iterator();
+        int count = 0;
+        final float extraSpace = size - textSizeInformation.size;
+
+        while (charSequenceElementIterator.hasNext()) {
+            final CharSequenceSizedElement charSequenceSizedElement = charSequenceElementIterator.next();
+
+            if (!charSequenceElementIterator.hasNext()) {
+                charSequenceSizedElement.spaceAfter = extraSpace;
+            }
+
+            count++;
+        }
+    }
+
+    private static void alignTextRight(final @NonNull TextSizeInformation textSizeInformation,
+                                       final float size) {
+        final Iterator<CharSequenceSizedElement> charSequenceElementIterator = textSizeInformation.charSequenceSizedElements.iterator();
+        int count = 0;
+        final float extraSpace = size - textSizeInformation.size;
+
+        while (charSequenceElementIterator.hasNext()) {
+            final CharSequenceSizedElement charSequenceSizedElement = charSequenceElementIterator.next();
+
+            if (count == 0) {
+                charSequenceSizedElement.spaceBefore = extraSpace;
+            }
+
+            count++;
+        }
+    }
+
+    private static void justifyText(final @NonNull TextSizeInformation textSizeInformation,
+                                    final float size, final boolean jis) {
+        float divider = 0;
+        int count = 0;
+
+        if (textSizeInformation.charSequenceSizedElements.size() == 1) {
+            centerText(textSizeInformation, size);
+
+            return;
+        }
+
+        Iterator<CharSequenceSizedElement> charSequenceElementIterator = textSizeInformation.charSequenceSizedElements.iterator();
+
+        while (charSequenceElementIterator.hasNext()) {
+            final CharSequenceSizedElement charSequenceSizedElement = charSequenceElementIterator.next();
+
+            if (charSequenceElementIterator.hasNext()) {
+                divider += charSequenceSizedElement.size / 2;
+            }
+
+            if (count != 0) {
+                divider += charSequenceSizedElement.size / 2;
+            }
+
+            if (jis) {
+                if (!charSequenceElementIterator.hasNext()) {
+                    divider += charSequenceSizedElement.size / 2;
+                }
+
+                if (count == 0) {
+                    divider += charSequenceSizedElement.size / 2;
+                }
+            }
+
+            count++;
+        }
+
+        final float extraSpaceUnit = (size - textSizeInformation.size) / divider;
+
+        count = 0;
+
+        charSequenceElementIterator = textSizeInformation.charSequenceSizedElements.iterator();
+
+        while (charSequenceElementIterator.hasNext()) {
+            final CharSequenceSizedElement charSequenceSizedElement = charSequenceElementIterator.next();
+
+            if (charSequenceElementIterator.hasNext()) {
+                charSequenceSizedElement.spaceAfter = charSequenceSizedElement.size * extraSpaceUnit / 2;
+            }
+
+            if (count != 0) {
+                charSequenceSizedElement.spaceBefore = charSequenceSizedElement.size * extraSpaceUnit / 2;
+            }
+
+            if (jis) {
+                if (!charSequenceElementIterator.hasNext()) {
+                    charSequenceSizedElement.spaceAfter += charSequenceSizedElement.size * extraSpaceUnit / 2;
+                }
+
+                if (count == 0) {
+                    charSequenceSizedElement.spaceBefore += charSequenceSizedElement.size * extraSpaceUnit / 2;
+                }
+            }
+
+            count++;
+        }
+    }
+
     private TextSizeInformation getTextSize(final @NonNull Paint paint, final @NonNull CharSequence text, int start, int end) {
         final List<CharSequenceElement> charSequenceElements = getCharSequenceElements(text, start, end);
         final Paint.FontMetricsInt fm = new Paint.FontMetricsInt();
         final LinkedList<CharSequenceSizedElement> charSequenceSizedElements = new LinkedList<>();
-
-        boolean a = paint.isUnderlineText();
 
         int size = 0;
 
@@ -269,8 +425,11 @@ public class SuperRubySpan extends ReplacementSpan {
 
     @Override
     public void draw(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint) {
-        boolean a = paint.isUnderlineText();
+        drawExpanded(canvas, text, start, end, x, top, y, bottom, paint, 0);
+    }
 
+    private void drawExpanded(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint,
+                              final float expandedSpanSize) {
         final TextPaint inheritPaint = new TextPaint(paint);
 
         final TextSizeInformation textSizeInformation = getTextSize(paint, text, start, end);
@@ -281,20 +440,44 @@ public class SuperRubySpan extends ReplacementSpan {
         }
 
         final TextSizeInformation furiganaSizeInformation = getTextSize(inheritPaint, mFurigana, 0, mFurigana.length());
-        final float spanSize = Math.round(Math.max(textSizeInformation.size,
-                furiganaSizeInformation.size));
+        final float spanSize = Math.round(Math.max(Math.max(textSizeInformation.size,
+                furiganaSizeInformation.size), expandedSpanSize));
 
-        float cursor = x + (spanSize - textSizeInformation.size) / 2f;
+        float cursor = x;
+        int count = 0;
+
+        switch (mTextAlignment) {
+            case Alignment.BEGIN:
+                alignTextLeft(textSizeInformation, spanSize);
+                break;
+            case Alignment.CENTER:
+                centerText(textSizeInformation, spanSize);
+                break;
+            case Alignment.END:
+                alignTextRight(textSizeInformation, spanSize);
+                break;
+            case Alignment.JUSTIFIED:
+                justifyText(textSizeInformation, spanSize, false);
+                break;
+            case Alignment.JIS:
+                justifyText(textSizeInformation, spanSize, true);
+                break;
+        }
 
         for (CharSequenceSizedElement charSequenceSizedElement : textSizeInformation.charSequenceSizedElements) {
             if(charSequenceSizedElement.textPaint.bgColor != 0) {
+                final float left = count == 0 ? cursor + charSequenceSizedElement.spaceBefore : cursor;
+                final float right = count == textSizeInformation.charSequenceSizedElements.size() - 1 ?
+                        cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size :
+                        cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
+
                 int previousColor = charSequenceSizedElement.textPaint.getColor();
                 Paint.Style previousStyle = charSequenceSizedElement.textPaint.getStyle();
                 charSequenceSizedElement.textPaint.setColor(charSequenceSizedElement.textPaint.bgColor);
                 charSequenceSizedElement.textPaint.setStyle(Paint.Style.FILL);
-                canvas.drawRect(cursor,
+                canvas.drawRect(left,
                         y + charSequenceSizedElement.fontMetricsInt.top,
-                        cursor + charSequenceSizedElement.size,
+                        right,
                         y + charSequenceSizedElement.fontMetricsInt.bottom, charSequenceSizedElement.textPaint);
                 charSequenceSizedElement.textPaint.setStyle(previousStyle);
                 charSequenceSizedElement.textPaint.setColor(previousColor);
@@ -302,35 +485,96 @@ public class SuperRubySpan extends ReplacementSpan {
 
             if (charSequenceSizedElement.charSequenceElement.replacementSpans != null &&
                     charSequenceSizedElement.charSequenceElement.replacementSpans.size() > 0) {
-                charSequenceSizedElement.charSequenceElement.replacementSpans.get(
-                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1).draw(canvas, text, start, end,
-                        cursor,
-                        top - textSizeInformation.fontMetricsInt.ascent +
-                                furiganaSizeInformation.fontMetricsInt.descent,
-                        y,
-                        bottom, charSequenceSizedElement.textPaint);
+                final ReplacementSpan replacementSpan = charSequenceSizedElement.charSequenceElement.replacementSpans.get(
+                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1);
+
+                if (replacementSpan instanceof SuperRubySpan) {
+                    ((SuperRubySpan) replacementSpan).drawExpanded(canvas, text, start, end,
+                            cursor,
+                            top - textSizeInformation.fontMetricsInt.ascent +
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            y,
+                            bottom, charSequenceSizedElement.textPaint,
+                            charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter);
+                } else {
+                    replacementSpan.draw(canvas, text, start, end,
+                            cursor + charSequenceSizedElement.spaceBefore,
+                            top - textSizeInformation.fontMetricsInt.ascent +
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            y,
+                            bottom, charSequenceSizedElement.textPaint);
+                }
             } else {
+                if (charSequenceSizedElement.spaceBefore != 0 && count != 0) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceBefore / spaceSize);
+
+                    canvas.drawText(" ", 0, 1, cursor, y,
+                            charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
+
                 canvas.drawText(text, charSequenceSizedElement.charSequenceElement.start,
                         charSequenceSizedElement.charSequenceElement.end,
-                        cursor, y, charSequenceSizedElement.textPaint);
+                        cursor + charSequenceSizedElement.spaceBefore, y, charSequenceSizedElement.textPaint);
+
+                if (charSequenceSizedElement.spaceAfter != 0 && count != textSizeInformation.charSequenceSizedElements.size() - 1) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceAfter / spaceSize);
+
+                    canvas.drawText(" ", 0, 1, cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size, y,
+                            charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
             }
 
-            cursor += charSequenceSizedElement.size;
+            cursor += charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
+            count++;
         }
 
-        float furiganaCursor = x + (spanSize - furiganaSizeInformation.size) / 2f;
+        float furiganaCursor = x;
+        count = 0;
+
+        switch (mFuriganaAlignment) {
+            case Alignment.BEGIN:
+                alignTextLeft(furiganaSizeInformation, spanSize);
+                break;
+            case Alignment.CENTER:
+                centerText(furiganaSizeInformation, spanSize);
+                break;
+            case Alignment.END:
+                alignTextRight(furiganaSizeInformation, spanSize);
+                break;
+            case Alignment.JUSTIFIED:
+                justifyText(furiganaSizeInformation, spanSize, false);
+                break;
+            case Alignment.JIS:
+                justifyText(furiganaSizeInformation, spanSize, true);
+                break;
+        }
 
         for (CharSequenceSizedElement charSequenceSizedElement : furiganaSizeInformation.charSequenceSizedElements) {
             if (charSequenceSizedElement.textPaint.bgColor != 0) {
+                final float left = count == 0 ? furiganaCursor + charSequenceSizedElement.spaceBefore : furiganaCursor;
+                final float right = count == furiganaSizeInformation.charSequenceSizedElements.size() - 1 ?
+                        furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size :
+                        furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
+
                 int previousColor = charSequenceSizedElement.textPaint.getColor();
                 Paint.Style previousStyle = charSequenceSizedElement.textPaint.getStyle();
                 charSequenceSizedElement.textPaint.setColor(charSequenceSizedElement.textPaint.bgColor);
                 charSequenceSizedElement.textPaint.setStyle(Paint.Style.FILL);
-                canvas.drawRect(furiganaCursor,
+                canvas.drawRect(left,
                         y + textSizeInformation.fontMetricsInt.ascent -
                                 charSequenceSizedElement.fontMetricsInt.descent
                                 + charSequenceSizedElement.fontMetricsInt.top,
-                        furiganaCursor + charSequenceSizedElement.size,
+                        right,
                         y + textSizeInformation.fontMetricsInt.ascent -
                                 charSequenceSizedElement.fontMetricsInt.descent
                                 + charSequenceSizedElement.fontMetricsInt.bottom, charSequenceSizedElement.textPaint);
@@ -340,29 +584,74 @@ public class SuperRubySpan extends ReplacementSpan {
 
             if (charSequenceSizedElement.charSequenceElement.replacementSpans != null &&
                     charSequenceSizedElement.charSequenceElement.replacementSpans.size() > 0) {
-                boolean b = charSequenceSizedElement.textPaint.isUnderlineText();
+                final ReplacementSpan replacementSpan = charSequenceSizedElement.charSequenceElement.replacementSpans.get(
+                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1);
 
-                charSequenceSizedElement.charSequenceElement.replacementSpans.get(
-                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1).draw(canvas,
-                        mFurigana,
-                        charSequenceSizedElement.charSequenceElement.start,
-                        charSequenceSizedElement.charSequenceElement.end,
-                        furiganaCursor,
-                        top,
-                        y + textSizeInformation.fontMetricsInt.ascent -
-                                furiganaSizeInformation.fontMetricsInt.descent,
-                        bottom + textSizeInformation.fontMetricsInt.ascent -
-                                furiganaSizeInformation.fontMetricsInt.descent -
-                                furiganaSizeInformation.fontMetricsInt.bottom,
-                        charSequenceSizedElement.textPaint);
+                if (replacementSpan instanceof SuperRubySpan) {
+                    ((SuperRubySpan) replacementSpan).drawExpanded(canvas,
+                            mFurigana,
+                            charSequenceSizedElement.charSequenceElement.start,
+                            charSequenceSizedElement.charSequenceElement.end,
+                            furiganaCursor,
+                            top,
+                            y + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            bottom + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent -
+                                    furiganaSizeInformation.fontMetricsInt.bottom,
+                            charSequenceSizedElement.textPaint,
+                            charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter);
+                } else {
+                    replacementSpan.draw(canvas,
+                            mFurigana,
+                            charSequenceSizedElement.charSequenceElement.start,
+                            charSequenceSizedElement.charSequenceElement.end,
+                            furiganaCursor + charSequenceSizedElement.spaceBefore,
+                            top,
+                            y + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            bottom + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent -
+                                    furiganaSizeInformation.fontMetricsInt.bottom,
+                            charSequenceSizedElement.textPaint);
+                }
             } else {
+                if (charSequenceSizedElement.spaceBefore != 0 && count != 0) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceBefore / spaceSize);
+
+                    canvas.drawText(" ", 0, 1, furiganaCursor,
+                            y + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
+
                 canvas.drawText(mFurigana, charSequenceSizedElement.charSequenceElement.start,
                         charSequenceSizedElement.charSequenceElement.end,
-                        furiganaCursor, y + textSizeInformation.fontMetricsInt.ascent -
+                        furiganaCursor + charSequenceSizedElement.spaceBefore, y + textSizeInformation.fontMetricsInt.ascent -
                                 furiganaSizeInformation.fontMetricsInt.descent, charSequenceSizedElement.textPaint);
+
+                if (charSequenceSizedElement.spaceAfter != 0 && count != furiganaSizeInformation.charSequenceSizedElements.size() - 1) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceAfter / spaceSize);
+
+                    canvas.drawText(" ", 0, 1, furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size,
+                            y + textSizeInformation.fontMetricsInt.ascent -
+                                    furiganaSizeInformation.fontMetricsInt.descent,
+                            charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
             }
 
-            furiganaCursor += charSequenceSizedElement.size;
+            furiganaCursor += charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
+            count++;
         }
     }
 }
