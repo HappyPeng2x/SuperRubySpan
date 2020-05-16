@@ -1,4 +1,40 @@
-apply plugin: 'com.android.library'
+plugins {
+    id "com.android.library"
+    id "com.jfrog.bintray" version "1.8.5"
+    id "maven-publish"
+}
+
+def bintrayPropertiesFile = rootProject.file("bintray.properties")
+def bintrayProperties = new Properties()
+bintrayProperties.load(new FileInputStream(bintrayPropertiesFile))
+
+def myVersionName = "0.1.0"
+
+def pomConfig = {
+    licenses {
+        license {
+            name "The Apache Software License, Version 2.0"
+            url "http://www.apache.org/licenses/LICENSE-2.0.txt"
+            distribution "Android"
+        }
+    }
+    developers {
+        developer {
+            id "HappyPeng"
+            name "Nicolas Centa"
+            email "nicolas.centa@gmail.com"
+        }
+    }
+
+    scm {
+        url "https://github.com/HappyPeng2x/SuperRubySpan"
+    }
+}
+
+task androidSourcesJar(type: Jar) {
+    archiveClassifier.set('sources')
+    from android.sourceSets.main.java.srcDirs
+}
 
 android {
     compileSdkVersion 29
@@ -8,7 +44,7 @@ android {
         minSdkVersion 14
         targetSdkVersion 29
         versionCode 1
-        versionName "1.0"
+        versionName = myVersionName
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles 'consumer-rules.pro'
@@ -21,6 +57,50 @@ android {
         }
     }
 
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+
+                artifact androidSourcesJar
+
+                groupId 'org.happypeng.android.sumatora.superrubyspan'
+                artifactId 'SuperRubySpan'
+                version = myVersionName
+
+                pom.withXml {
+                    def root = asNode()
+                    root.appendNode('description', 'A span to display ruby (furigana) in an Android TextView')
+                    root.appendNode('name', 'SuperRubySpan')
+                    root.appendNode('url', 'https://github.com/HappyPeng2x/SuperRubySpan')
+                    root.children().last() + pomConfig
+                }
+            }
+        }
+
+        bintray {
+            publications = ['release']
+
+            user = bintrayProperties['user']
+            key = bintrayProperties['key']
+
+            pkg {
+                repo = 'Android'
+                name = 'SuperRubySpan'
+                licenses = ['Apache-2.0']
+                vcsUrl = 'https://github.com/HappyPeng2x/SuperRubySpan.git'
+                version {
+                    name = myVersionName
+                    released  = new Date()
+                }
+            }
+
+            publish = true
+        }
+    }
 }
 
 dependencies {
