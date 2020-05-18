@@ -428,6 +428,120 @@ public class SuperRubySpan extends ReplacementSpan {
         drawExpanded(canvas, text, start, end, x, top, y, bottom, paint, 0);
     }
 
+    private static void drawBackground(final @NonNull CharSequenceSizedElement aCharSequenceSizedElement,
+                                       final @NonNull Canvas aCanvas,
+                                       final float aX,
+                                       final int aY,
+                                       final boolean aFirstChar,
+                                       final boolean aLastChar) {
+        if(aCharSequenceSizedElement.textPaint.bgColor != 0) {
+            final float left = aFirstChar ? aX + aCharSequenceSizedElement.spaceBefore : aX;
+            final float right = aLastChar ?
+                    aX + aCharSequenceSizedElement.spaceBefore + aCharSequenceSizedElement.size :
+                    aX + aCharSequenceSizedElement.spaceBefore + aCharSequenceSizedElement.size +
+                            aCharSequenceSizedElement.spaceAfter;
+
+            int previousColor = aCharSequenceSizedElement.textPaint.getColor();
+            Paint.Style previousStyle = aCharSequenceSizedElement.textPaint.getStyle();
+            aCharSequenceSizedElement.textPaint.setColor(aCharSequenceSizedElement.textPaint.bgColor);
+            aCharSequenceSizedElement.textPaint.setStyle(Paint.Style.FILL);
+            aCanvas.drawRect(left,
+                    aY + aCharSequenceSizedElement.fontMetricsInt.top,
+                    right,
+                    aY + aCharSequenceSizedElement.fontMetricsInt.bottom, aCharSequenceSizedElement.textPaint);
+            aCharSequenceSizedElement.textPaint.setStyle(previousStyle);
+            aCharSequenceSizedElement.textPaint.setColor(previousColor);
+        }
+    }
+
+    private static void drawText(final @NonNull CharSequence aText,
+                                 final @NonNull TextSizeInformation aTextSizeInformation,
+                                 final @Alignment int aAlignment,
+                                 final @NonNull Canvas aCanvas,
+                                 final float aSpanSize,
+                                 final float aStartX,
+                                 final int aY,
+                                 final int aTop,
+                                 final int aBottom) {
+        switch (aAlignment) {
+            case Alignment.BEGIN:
+                alignTextLeft(aTextSizeInformation, aSpanSize);
+                break;
+            case Alignment.CENTER:
+                centerText(aTextSizeInformation, aSpanSize);
+                break;
+            case Alignment.END:
+                alignTextRight(aTextSizeInformation, aSpanSize);
+                break;
+            case Alignment.JUSTIFIED:
+                justifyText(aTextSizeInformation, aSpanSize, false);
+                break;
+            case Alignment.JIS:
+                justifyText(aTextSizeInformation, aSpanSize, true);
+                break;
+        }
+
+        float cursor = aStartX;
+        int count = 0;
+
+        for (CharSequenceSizedElement charSequenceSizedElement : aTextSizeInformation.charSequenceSizedElements) {
+            drawBackground(charSequenceSizedElement, aCanvas, cursor, aY,
+                    cursor == 0,
+                    count == aTextSizeInformation.charSequenceSizedElements.size() - 1);
+
+            if (charSequenceSizedElement.charSequenceElement.replacementSpans != null &&
+                    charSequenceSizedElement.charSequenceElement.replacementSpans.size() > 0) {
+                final ReplacementSpan replacementSpan = charSequenceSizedElement.charSequenceElement.replacementSpans.get(
+                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1);
+
+                if (replacementSpan instanceof SuperRubySpan) {
+                    ((SuperRubySpan) replacementSpan).drawExpanded(aCanvas, aText,
+                            charSequenceSizedElement.charSequenceElement.start,
+                            charSequenceSizedElement.charSequenceElement.end,
+                            cursor,
+                            aTop, aY, aBottom, charSequenceSizedElement.textPaint,
+                            charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter);
+                } else {
+                    replacementSpan.draw(aCanvas, aText, charSequenceSizedElement.charSequenceElement.start,
+                            charSequenceSizedElement.charSequenceElement.end,
+                            cursor + charSequenceSizedElement.spaceBefore,
+                            aTop, aY, aBottom, charSequenceSizedElement.textPaint);
+                }
+            } else {
+                if (charSequenceSizedElement.spaceBefore != 0 && count != 0) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceBefore / spaceSize);
+
+                    aCanvas.drawText(" ", 0, 1, cursor, aY,
+                            charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
+
+                aCanvas.drawText(aText, charSequenceSizedElement.charSequenceElement.start,
+                        charSequenceSizedElement.charSequenceElement.end,
+                        cursor + charSequenceSizedElement.spaceBefore, aY, charSequenceSizedElement.textPaint);
+
+                if (charSequenceSizedElement.spaceAfter != 0 && count != aTextSizeInformation.charSequenceSizedElements.size() - 1) {
+                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
+                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceAfter / spaceSize);
+
+                    aCanvas.drawText(" ", 0, 1, cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size,
+                            aY, charSequenceSizedElement.textPaint);
+
+                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
+                }
+            }
+
+            cursor += charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
+            count++;
+        }
+    }
+
     private void drawExpanded(@NonNull Canvas canvas, CharSequence text, int start, int end, float x, int top, int y, int bottom, @NonNull Paint paint,
                               final float expandedSpanSize) {
         final TextPaint inheritPaint = new TextPaint(paint);
@@ -440,218 +554,23 @@ public class SuperRubySpan extends ReplacementSpan {
         }
 
         final TextSizeInformation furiganaSizeInformation = getTextSize(inheritPaint, mFurigana, 0, mFurigana.length());
+
         final float spanSize = Math.round(Math.max(Math.max(textSizeInformation.size,
                 furiganaSizeInformation.size), expandedSpanSize));
 
-        float cursor = x;
-        int count = 0;
+        drawText(text, textSizeInformation, mTextAlignment, canvas,
+                spanSize, x, y,
+                top - textSizeInformation.fontMetricsInt.ascent +
+                        furiganaSizeInformation.fontMetricsInt.descent,
+                bottom);
 
-        switch (mTextAlignment) {
-            case Alignment.BEGIN:
-                alignTextLeft(textSizeInformation, spanSize);
-                break;
-            case Alignment.CENTER:
-                centerText(textSizeInformation, spanSize);
-                break;
-            case Alignment.END:
-                alignTextRight(textSizeInformation, spanSize);
-                break;
-            case Alignment.JUSTIFIED:
-                justifyText(textSizeInformation, spanSize, false);
-                break;
-            case Alignment.JIS:
-                justifyText(textSizeInformation, spanSize, true);
-                break;
-        }
-
-        for (CharSequenceSizedElement charSequenceSizedElement : textSizeInformation.charSequenceSizedElements) {
-            if(charSequenceSizedElement.textPaint.bgColor != 0) {
-                final float left = count == 0 ? cursor + charSequenceSizedElement.spaceBefore : cursor;
-                final float right = count == textSizeInformation.charSequenceSizedElements.size() - 1 ?
-                        cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size :
-                        cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
-
-                int previousColor = charSequenceSizedElement.textPaint.getColor();
-                Paint.Style previousStyle = charSequenceSizedElement.textPaint.getStyle();
-                charSequenceSizedElement.textPaint.setColor(charSequenceSizedElement.textPaint.bgColor);
-                charSequenceSizedElement.textPaint.setStyle(Paint.Style.FILL);
-                canvas.drawRect(left,
-                        y + charSequenceSizedElement.fontMetricsInt.top,
-                        right,
-                        y + charSequenceSizedElement.fontMetricsInt.bottom, charSequenceSizedElement.textPaint);
-                charSequenceSizedElement.textPaint.setStyle(previousStyle);
-                charSequenceSizedElement.textPaint.setColor(previousColor);
-            }
-
-            if (charSequenceSizedElement.charSequenceElement.replacementSpans != null &&
-                    charSequenceSizedElement.charSequenceElement.replacementSpans.size() > 0) {
-                final ReplacementSpan replacementSpan = charSequenceSizedElement.charSequenceElement.replacementSpans.get(
-                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1);
-
-                if (replacementSpan instanceof SuperRubySpan) {
-                    ((SuperRubySpan) replacementSpan).drawExpanded(canvas, text, start, end,
-                            cursor,
-                            top - textSizeInformation.fontMetricsInt.ascent +
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            y,
-                            bottom, charSequenceSizedElement.textPaint,
-                            charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter);
-                } else {
-                    replacementSpan.draw(canvas, text, start, end,
-                            cursor + charSequenceSizedElement.spaceBefore,
-                            top - textSizeInformation.fontMetricsInt.ascent +
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            y,
-                            bottom, charSequenceSizedElement.textPaint);
-                }
-            } else {
-                if (charSequenceSizedElement.spaceBefore != 0 && count != 0) {
-                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
-                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceBefore / spaceSize);
-
-                    canvas.drawText(" ", 0, 1, cursor, y,
-                            charSequenceSizedElement.textPaint);
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
-                }
-
-                canvas.drawText(text, charSequenceSizedElement.charSequenceElement.start,
-                        charSequenceSizedElement.charSequenceElement.end,
-                        cursor + charSequenceSizedElement.spaceBefore, y, charSequenceSizedElement.textPaint);
-
-                if (charSequenceSizedElement.spaceAfter != 0 && count != textSizeInformation.charSequenceSizedElements.size() - 1) {
-                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
-                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceAfter / spaceSize);
-
-                    canvas.drawText(" ", 0, 1, cursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size, y,
-                            charSequenceSizedElement.textPaint);
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
-                }
-            }
-
-            cursor += charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
-            count++;
-        }
-
-        float furiganaCursor = x;
-        count = 0;
-
-        switch (mFuriganaAlignment) {
-            case Alignment.BEGIN:
-                alignTextLeft(furiganaSizeInformation, spanSize);
-                break;
-            case Alignment.CENTER:
-                centerText(furiganaSizeInformation, spanSize);
-                break;
-            case Alignment.END:
-                alignTextRight(furiganaSizeInformation, spanSize);
-                break;
-            case Alignment.JUSTIFIED:
-                justifyText(furiganaSizeInformation, spanSize, false);
-                break;
-            case Alignment.JIS:
-                justifyText(furiganaSizeInformation, spanSize, true);
-                break;
-        }
-
-        for (CharSequenceSizedElement charSequenceSizedElement : furiganaSizeInformation.charSequenceSizedElements) {
-            if (charSequenceSizedElement.textPaint.bgColor != 0) {
-                final float left = count == 0 ? furiganaCursor + charSequenceSizedElement.spaceBefore : furiganaCursor;
-                final float right = count == furiganaSizeInformation.charSequenceSizedElements.size() - 1 ?
-                        furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size :
-                        furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
-
-                int previousColor = charSequenceSizedElement.textPaint.getColor();
-                Paint.Style previousStyle = charSequenceSizedElement.textPaint.getStyle();
-                charSequenceSizedElement.textPaint.setColor(charSequenceSizedElement.textPaint.bgColor);
-                charSequenceSizedElement.textPaint.setStyle(Paint.Style.FILL);
-                canvas.drawRect(left,
-                        y + textSizeInformation.fontMetricsInt.ascent -
-                                charSequenceSizedElement.fontMetricsInt.descent
-                                + charSequenceSizedElement.fontMetricsInt.top,
-                        right,
-                        y + textSizeInformation.fontMetricsInt.ascent -
-                                charSequenceSizedElement.fontMetricsInt.descent
-                                + charSequenceSizedElement.fontMetricsInt.bottom, charSequenceSizedElement.textPaint);
-                charSequenceSizedElement.textPaint.setStyle(previousStyle);
-                charSequenceSizedElement.textPaint.setColor(previousColor);
-            }
-
-            if (charSequenceSizedElement.charSequenceElement.replacementSpans != null &&
-                    charSequenceSizedElement.charSequenceElement.replacementSpans.size() > 0) {
-                final ReplacementSpan replacementSpan = charSequenceSizedElement.charSequenceElement.replacementSpans.get(
-                        charSequenceSizedElement.charSequenceElement.replacementSpans.size() - 1);
-
-                if (replacementSpan instanceof SuperRubySpan) {
-                    ((SuperRubySpan) replacementSpan).drawExpanded(canvas,
-                            mFurigana,
-                            charSequenceSizedElement.charSequenceElement.start,
-                            charSequenceSizedElement.charSequenceElement.end,
-                            furiganaCursor,
-                            top,
-                            y + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            bottom + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent -
-                                    furiganaSizeInformation.fontMetricsInt.bottom,
-                            charSequenceSizedElement.textPaint,
-                            charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter);
-                } else {
-                    replacementSpan.draw(canvas,
-                            mFurigana,
-                            charSequenceSizedElement.charSequenceElement.start,
-                            charSequenceSizedElement.charSequenceElement.end,
-                            furiganaCursor + charSequenceSizedElement.spaceBefore,
-                            top,
-                            y + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            bottom + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent -
-                                    furiganaSizeInformation.fontMetricsInt.bottom,
-                            charSequenceSizedElement.textPaint);
-                }
-            } else {
-                if (charSequenceSizedElement.spaceBefore != 0 && count != 0) {
-                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
-                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceBefore / spaceSize);
-
-                    canvas.drawText(" ", 0, 1, furiganaCursor,
-                            y + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            charSequenceSizedElement.textPaint);
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
-                }
-
-                canvas.drawText(mFurigana, charSequenceSizedElement.charSequenceElement.start,
-                        charSequenceSizedElement.charSequenceElement.end,
-                        furiganaCursor + charSequenceSizedElement.spaceBefore, y + textSizeInformation.fontMetricsInt.ascent -
-                                furiganaSizeInformation.fontMetricsInt.descent, charSequenceSizedElement.textPaint);
-
-                if (charSequenceSizedElement.spaceAfter != 0 && count != furiganaSizeInformation.charSequenceSizedElements.size() - 1) {
-                    final float spaceSize = charSequenceSizedElement.textPaint.measureText(" ");
-                    final float scaleX = charSequenceSizedElement.textPaint.getTextScaleX();
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(charSequenceSizedElement.spaceAfter / spaceSize);
-
-                    canvas.drawText(" ", 0, 1, furiganaCursor + charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size,
-                            y + textSizeInformation.fontMetricsInt.ascent -
-                                    furiganaSizeInformation.fontMetricsInt.descent,
-                            charSequenceSizedElement.textPaint);
-
-                    charSequenceSizedElement.textPaint.setTextScaleX(scaleX);
-                }
-            }
-
-            furiganaCursor += charSequenceSizedElement.spaceBefore + charSequenceSizedElement.size + charSequenceSizedElement.spaceAfter;
-            count++;
-        }
+        drawText(mFurigana, furiganaSizeInformation, mFuriganaAlignment, canvas,
+                spanSize, x,
+                y + textSizeInformation.fontMetricsInt.ascent -
+                        furiganaSizeInformation.fontMetricsInt.descent,
+                top,
+                bottom + textSizeInformation.fontMetricsInt.ascent -
+                        furiganaSizeInformation.fontMetricsInt.descent -
+                        furiganaSizeInformation.fontMetricsInt.bottom);
     }
 }
