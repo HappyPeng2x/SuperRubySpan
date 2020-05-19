@@ -8,7 +8,8 @@ def bintrayPropertiesFile = rootProject.file("bintray.properties")
 def bintrayProperties = new Properties()
 bintrayProperties.load(new FileInputStream(bintrayPropertiesFile))
 
-def myVersionName = "0.1.0"
+def myVersionName = "0.2.0"
+def myVersionCode = 2
 
 def pomConfig = {
     licenses {
@@ -43,7 +44,7 @@ android {
     defaultConfig {
         minSdkVersion 14
         targetSdkVersion 29
-        versionCode 1
+        versionCode = myVersionCode
         versionName = myVersionName
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -107,7 +108,7 @@ dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
     implementation 'androidx.appcompat:appcompat:1.1.0'
-    testImplementation 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.13'
     androidTestImplementation 'androidx.test.ext:junit:1.1.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
 }

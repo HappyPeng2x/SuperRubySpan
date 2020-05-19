@@ -19,6 +19,7 @@ package org.happypeng.sumatora.android.superrubyspan.demo;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.SpannableString;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.BackgroundColorSpan;
@@ -31,7 +32,12 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.happypeng.sumatora.android.superrubyspan.SuperReplacementSpan;
 import org.happypeng.sumatora.android.superrubyspan.SuperRubySpan;
+import org.happypeng.sumatora.android.superrubyspan.tools.JapaneseText;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
     private CharSequence test1() {
@@ -265,6 +271,18 @@ public class MainActivity extends AppCompatActivity {
         return spannableStringBuilder;
     }
 
+
+    private CharSequence test5() {
+        SpannableStringBuilder spannableStringBuilder =
+                new SpannableStringBuilder();
+
+        JapaneseText.spannifyWithFurigana(spannableStringBuilder,
+                "→ 「あれ？{恵子;けいこ}は？」「{今日;きょう}は{三;さん}{者;しゃ}{面談;めんだん}だから{遅れる;おくれる}って」",
+                0.9f);
+
+        return spannableStringBuilder;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -282,6 +300,10 @@ public class MainActivity extends AppCompatActivity {
         spannableStringBuilder.append(test3());
         spannableStringBuilder.append(" ");
         spannableStringBuilder.append(test4());
+        spannableStringBuilder.append(" ");
+
+        spannableStringBuilder.append("\n");
+        spannableStringBuilder.append(test5());
 
         mainTextView.setText(spannableStringBuilder);
     }
